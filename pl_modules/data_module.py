@@ -144,6 +144,7 @@ class ReconstructKspaceDataModule(FastMriDataModule):
         train_transform: Callable, 
         val_transform: Callable, 
         test_transform: Callable, 
+        model_transform: Callable,
         combine_train_val: bool = False, 
         test_split: str = "test", 
         test_path: Optional[Path] = None, 
@@ -183,6 +184,8 @@ class ReconstructKspaceDataModule(FastMriDataModule):
             batch_size, 
             num_workers, 
             distributed_sampler)
+        
+        self.model_transform = model_transform
     
     def _create_data_loader(
         self,
@@ -256,6 +259,7 @@ class ReconstructKspaceDataModule(FastMriDataModule):
             dataset = ReconstructKspaceDataset(
                 root=data_path,
                 transform=data_transform,
+                model_transform=self.model_transform,
                 sample_rate=sample_rate,
                 volume_sample_rate=volume_sample_rate,
                 challenge=self.challenge,
@@ -320,6 +324,7 @@ class ReconstructKspaceDataModule(FastMriDataModule):
                 _ = ReconstructKspaceDataset(
                     root=data_path,
                     transform=data_transform,
+                    model_transform=self.model_transform,
                     sample_rate=sample_rate,
                     volume_sample_rate=volume_sample_rate,
                     challenge=self.challenge,

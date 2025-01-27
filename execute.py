@@ -2,17 +2,24 @@ from pl_modules import PixelCNNModule, ReconstructKspaceDataModule
 import pytorch_lightning as pl
 from pathlib import Path
 from modules.kspace_data import KspaceDataTransform
+from torchvision import transforms
 
+# Data Loaders
+transform = transforms.Compose([
+    transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
+])
 
 if __name__ == "__main__":  
-    model = PixelCNNModule()
+    model = PixelCNNModule(lr=0.00001)
     dm = ReconstructKspaceDataModule(
-        Path("knee_dataset"),
+        Path("../knee_dataset"),
         challenge="singlecoil",
         train_transform=KspaceDataTransform(),
         val_transform=KspaceDataTransform(),
         test_transform=KspaceDataTransform(),
+        model_transform=transform,
         batch_size=1,
-        num_workers=4)
-    trainer = pl.Trainer(max_epochs=2, default_root_dir="./pixelcnn/")
+        num_workers=8,
+        use_dataset_cache_file=True)
+    trainer = pl.Trainer(max_epochs=25)
     trainer.fit(model, dm)

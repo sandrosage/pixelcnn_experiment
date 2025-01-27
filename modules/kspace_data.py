@@ -105,12 +105,12 @@ class KspaceSample(NamedTuple):
     """
     kspace : torch.Tensor
     masked_kspace: torch.Tensor
-    num_low_frequencies: Optional[int]
-    target: torch.Tensor
-    fname: str
-    slice_num: int
-    max_value: float
-    crop_size: Tuple[int, int]
+    # num_low_frequencies: Optional[int]
+    # target: torch.Tensor
+    # fname: str
+    # slice_num: int
+    # max_value: float
+    # crop_size: Tuple[int, int]
 
 
 class KspaceDataTransform:
@@ -177,23 +177,23 @@ class KspaceDataTransform:
             sample = KspaceSample(
                 kspace=kspace_torch,
                 masked_kspace=masked_kspace,
-                num_low_frequencies=num_low_frequencies,
-                target=target_torch,
-                fname=fname,
-                slice_num=slice_num,
-                max_value=max_value,
-                crop_size=crop_size,
+                # num_low_frequencies=num_low_frequencies,
+                # target=target_torch,
+                # fname=fname,
+                # slice_num=slice_num,
+                # max_value=max_value,
+                # crop_size=crop_size,
             )
         else:
             sample = KspaceSample(
                 kspace=kspace_torch,
                 masked_kspace=kspace_torch,
-                num_low_frequencies=0,
-                target=target_torch,
-                fname=fname,
-                slice_num=slice_num,
-                max_value=max_value,
-                crop_size=crop_size,
+                # num_low_frequencies=0,
+                # target=target_torch,
+                # fname=fname,
+                # slice_num=slice_num,
+                # max_value=max_value,
+                # crop_size=crop_size,
             )
 
         return sample

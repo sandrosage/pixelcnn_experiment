@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 from torch import optim
 from argparse import ArgumentParser
 from pytorch_lightning.utilities.data import extract_batch_size
+import torch
 
 
 class PixelCNNModule(pl.LightningModule):
@@ -46,7 +47,10 @@ class PixelCNNModule(pl.LightningModule):
         input = rearrange_kspace(batch.masked_kspace,0)
         mean, log_scale = self(input)
         loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
-        self.log("train_loss", loss, batch_size=extract_batch_size(batch))
+        self.log("train_loss", loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
+        # Log GPU memory at any point
+        # print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+        # print(f"Reserved: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -54,15 +58,14 @@ class PixelCNNModule(pl.LightningModule):
         input = rearrange_kspace(batch.masked_kspace,0)
         mean, log_scale = self(input)
         test_loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
-        self.log("test_loss", test_loss, batch_size=extract_batch_size(batch))
+        self.log("test_loss", test_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
     
     def validation_step(self, batch, batch_idx):
-        print("Batch size: ", extract_batch_size(batch))
         target = rearrange_kspace(batch.kspace,0)
         input = rearrange_kspace(batch.masked_kspace,0)
         mean, log_scale = self(input)
         val_loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
-        self.log("val_loss", val_loss, 1)
+        self.log("val_loss", val_loss, sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
 
     @staticmethod
     def add_model_specific_args(parent_parser):  # pragma: no-cover

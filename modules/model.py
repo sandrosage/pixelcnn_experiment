@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.distributions import Laplace
 import pytorch_lightning as pl
-from typing import Union
+from typing import Literal
 
 # Laplace NLL Loss Function
 def laplace_nll(mean, log_scale, target):
@@ -15,12 +15,14 @@ def laplace_nll(mean, log_scale, target):
     Returns:
         Negative log-likelihood loss.
     """
+    # print("Mean: ", mean.min(), mean.max())
     scale = torch.exp(log_scale)  # Scale is exp(log_scale) for numerical stability
+    # print("Scale: ", scale.min(), scale.max())
     dist = Laplace(mean, scale)
     nll = -dist.log_prob(target)  # Negative log likelihood
     return nll.mean()
 
-def rearrange_kspace(kspace: torch.Tensor, imag: Union[0,1]): 
+def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
     return kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
 
 # LaplaceConv2d Definition
@@ -234,7 +236,7 @@ class PixelCNN(nn.Module):
                 nn.Sequential(MaskedConv2d('B',self._channels, self._channels, self._kernel, 1, self._kernel//2, bias=False), nn.BatchNorm2d(self._channels), nn.ReLU(True)) for _ in range(self._n_layers - 1)
             ])
 
-        self._head = LaplaceConv2d(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0, bias=True)  # Outputs mean and log_scale
+        self._head = LaplaceConv2d(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0)  # Outputs mean and log_scale
 
     def forward(self, x):
         x = self._input(x)
