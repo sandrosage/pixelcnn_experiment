@@ -4,12 +4,13 @@ from pathlib import Path
 from modules.kspace_data import KspaceDataTransform
 from torchvision import transforms
 
-# Data Loaders
-transform = transforms.Compose([
-    transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
-])
 
-if __name__ == "__main__":  
+
+if __name__ == "__main__": 
+    # Data Loaders
+    transform = transforms.Compose([
+        transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
+    ]) 
     model = PixelCNNModule(lr=0.00001)
     dm = ReconstructKspaceDataModule(
         Path("../knee_dataset"),

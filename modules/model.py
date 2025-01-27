@@ -18,12 +18,44 @@ def laplace_nll(mean, log_scale, target):
     # print("Mean: ", mean.min(), mean.max())
     scale = torch.exp(log_scale)  # Scale is exp(log_scale) for numerical stability
     # print("Scale: ", scale.min(), scale.max())
+    # print("Log Scale: ", log_scale.min(), log_scale.max())
     dist = Laplace(mean, scale)
     nll = -dist.log_prob(target)  # Negative log likelihood
     return nll.mean()
 
 def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
     return kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
+
+
+class LaplaceConv2dBN(nn.Module):
+    def __init__(self, in_channels, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True, eps=1e-6):
+        """
+        Outputs parameters (mean, log_scale) of a Laplace distribution for each pixel.
+        Normalization added to make training more robust.
+        """
+        super(LaplaceConv2dBN, self).__init__()
+        self.eps = eps
+        
+        # Define convolution layers for mean and log_scale
+        self.conv_mean = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
+        self.conv_log_scale = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
+        
+        # Add Batch Normalization for both conv layers (to stabilize outputs)
+        self.bn_mean = nn.BatchNorm2d(out_channels)
+        self.bn_log_scale = nn.BatchNorm2d(out_channels)
+
+    def forward(self, x):
+        # Compute mean and log_scale
+        mean = self.conv_mean(x)
+        mean = self.bn_mean(mean)  # Normalize mean
+
+        log_scale = self.conv_log_scale(x)
+        log_scale = self.bn_log_scale(log_scale)  # Normalize log_scale
+        
+        # Clamp log_scale to avoid extreme values and numerical issues
+        log_scale = torch.clamp(log_scale, min=torch.log(torch.tensor(self.eps, device=log_scale.device)))
+
+        return mean, log_scale
 
 # LaplaceConv2d Definition
 class LaplaceConv2d(nn.Module):
@@ -236,7 +268,7 @@ class PixelCNN(nn.Module):
                 nn.Sequential(MaskedConv2d('B',self._channels, self._channels, self._kernel, 1, self._kernel//2, bias=False), nn.BatchNorm2d(self._channels), nn.ReLU(True)) for _ in range(self._n_layers - 1)
             ])
 
-        self._head = LaplaceConv2d(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0)  # Outputs mean and log_scale
+        self._head = LaplaceConv2dBN(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0)  # Outputs mean and log_scale
 
     def forward(self, x):
         x = self._input(x)
