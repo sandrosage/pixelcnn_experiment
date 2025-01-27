@@ -4,3 +4,5 @@ torchvision
 fastmri
 requests
 torchsummary
+pytorch-lightning
+tensorboard
