@@ -11,7 +11,7 @@ if __name__ == "__main__":
     transform = transforms.Compose([
         transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
     ]) 
-    model = PixelCNNModule(lr=0.00001)
+    model = PixelCNNModule()
     dm = ReconstructKspaceDataModule(
         Path("../knee_dataset"),
         challenge="singlecoil",

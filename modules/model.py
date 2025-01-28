@@ -4,24 +4,65 @@ from torch.distributions import Laplace
 import pytorch_lightning as pl
 from typing import Literal
 
-# Laplace NLL Loss Function
-def laplace_nll(mean, log_scale, target):
+# # Laplace NLL Loss Function
+# def laplace_nll(mean, log_scale, target, max_scale=10.0):
+#     """
+#     Computes the negative log-likelihood for Laplace predictions, 
+#     with softplus activation for smooth positivity and a max threshold on scale.
+    
+#     Args:
+#         mean: Predicted mean.
+#         log_scale: Predicted log-scale.
+#         target: Ground truth values.
+#         max_scale: Maximum allowable scale (default: 10.0).
+    
+#     Returns:
+#         Negative log-likelihood loss.
+#     """
+#     # Use softplus to ensure scale > 0, then apply max threshold
+#     scale = torch.clamp(torch.exp(log_scale), max=10)
+#     # scale = torch.nn.functional.softplus(log_scale, threshold=10)
+#     print("Scale: ", scale.max(), scale.min())
+#     # scale = torch.clamp(scale, max=max_scale)  # Cap the scale to the maximum value
+#     # Define Laplace distribution
+#     dist = torch.distributions.Laplace(mean, scale)
+    
+#     # Compute negative log likelihood
+#     nll = -dist.log_prob(target)
+#     return nll.mean()
+
+def laplace_nll(mean, log_scale, target, lambda_reg=1e-3):
     """
-    Computes the negative log-likelihood for Laplace predictions.
+    Computes the negative log-likelihood for Laplace predictions with L2 regularization on log_scale.
+    
     Args:
         mean: Predicted mean.
         log_scale: Predicted log-scale.
         target: Ground truth values.
+        lambda_reg: Strength of the L2 regularization term (default: 1e-3).
+    
     Returns:
-        Negative log-likelihood loss.
+        Loss (negative log-likelihood + L2 regularization penalty).
     """
-    # print("Mean: ", mean.min(), mean.max())
-    scale = torch.exp(log_scale)  # Scale is exp(log_scale) for numerical stability
-    # print("Scale: ", scale.min(), scale.max())
-    # print("Log Scale: ", log_scale.min(), log_scale.max())
-    dist = Laplace(mean, scale)
-    nll = -dist.log_prob(target)  # Negative log likelihood
-    return nll.mean()
+    # Compute scale from log_scale using softplus or exp
+    # print("Log scale: ", log_scale.max(), log_scale.min())
+    # scale = torch.clamp(torch.exp(log_scale), max=10)
+    scale = torch.nn.functional.softplus(log_scale, threshold=10) + 1e-9  # Ensure strictly positive scale
+    # print("Scale: ", scale.max(), scale.min())
+    # Define Laplace distribution
+    dist = torch.distributions.Laplace(mean, scale)
+    
+    # Compute negative log likelihood
+    nll = -dist.log_prob(target)
+    nll_loss = nll.mean()
+    
+    # Add L2 regularization on log_scale
+    l2_regularization = lambda_reg * torch.mean(log_scale**2)
+    
+    # Total loss
+    total_loss = nll_loss + l2_regularization
+    return total_loss, nll_loss, l2_regularization
+
 
 def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
     return kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
@@ -52,8 +93,10 @@ class LaplaceConv2dBN(nn.Module):
         log_scale = self.conv_log_scale(x)
         log_scale = self.bn_log_scale(log_scale)  # Normalize log_scale
         
-        # Clamp log_scale to avoid extreme values and numerical issues
+        # # Clamp log_scale to avoid extreme values and numerical issues
+        print("Clamp: ", torch.log(torch.tensor(self.eps, device=log_scale.device)))
         log_scale = torch.clamp(log_scale, min=torch.log(torch.tensor(self.eps, device=log_scale.device)))
+        # print("log_scale")
 
         return mean, log_scale
 
@@ -268,7 +311,7 @@ class PixelCNN(nn.Module):
                 nn.Sequential(MaskedConv2d('B',self._channels, self._channels, self._kernel, 1, self._kernel//2, bias=False), nn.BatchNorm2d(self._channels), nn.ReLU(True)) for _ in range(self._n_layers - 1)
             ])
 
-        self._head = LaplaceConv2dBN(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0)  # Outputs mean and log_scale
+        self._head = LaplaceConv2d(self._channels, self._in_channels, kernel_size=1, stride=1, padding=0)  # Outputs mean and log_scale
 
     def forward(self, x):
         x = self._input(x)
