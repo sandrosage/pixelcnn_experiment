@@ -1,4 +1,4 @@
-from modules.model import PixelCNN, rearrange_kspace, GatedPixelCNN, ResidualPixelCNN, LaplaceNLL
+from modules.model import PixelCNN, rearrange_kspace, LaplaceNLL
 import pytorch_lightning as pl
 from torch import optim, nn
 from argparse import ArgumentParser
