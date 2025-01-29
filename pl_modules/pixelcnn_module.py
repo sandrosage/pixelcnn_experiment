@@ -1,10 +1,11 @@
-from modules.model import PixelCNN, laplace_nll, rearrange_kspace, GatedPixelCNN, ResidualPixelCNN
+from modules.model import PixelCNN, rearrange_kspace, GatedPixelCNN, ResidualPixelCNN, LaplaceNLL
 import pytorch_lightning as pl
-from torch import optim
+from torch import optim, nn
 from argparse import ArgumentParser
-from pytorch_lightning.utilities.data import extract_batch_size
+from typing import Literal, Optional
+from ignite.metrics import SSIM
+from torch.distributions import Laplace
 import torch
-
 
 class PixelCNNModule(pl.LightningModule):
     def __init__(self, 
@@ -15,6 +16,8 @@ class PixelCNNModule(pl.LightningModule):
             lr_step_size: int = 40,
             lr_gamma: float = 0.1,
             weight_decay: float = 0.0,
+            test_criterion: Optional[Literal["mse", "ssim"]] = None,
+            channel_mode: Literal["real", "imag"] = "real",
             **kwargs
         ):
         super().__init__(**kwargs)
@@ -28,6 +31,24 @@ class PixelCNNModule(pl.LightningModule):
         self.lr_gamma = lr_gamma
         self.weight_decay = weight_decay
         self.model = PixelCNN(in_channels=self.in_channels, n_layers=self.n_layers, hidden_channels=self.hidden_channels)
+        self.criterion = LaplaceNLL()
+        
+        assert channel_mode in ("real", "imag"), "channel_mode must either be 'real' or 'imag'"
+        assert test_criterion in ("mse", "ssim") or None, "test_criterion must be either 'mse', 'ssim' or None"
+        
+        if channel_mode == "real":
+            self.mode = 0
+        
+        else:
+            self.mode = 1
+
+        if test_criterion == "mse":
+            self.test_criterion = nn.MSELoss()
+        elif test_criterion == "ssim":
+            self.test_criterion = SSIM()
+        else:
+            self.test_criterion = None
+            
     
     def configure_optimizers(self):
         optimizer = optim.Adam(
@@ -43,33 +64,38 @@ class PixelCNNModule(pl.LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,0)
-        input = rearrange_kspace(batch.masked_kspace,0)
+        target = rearrange_kspace(batch.kspace,self.mode)
+        input = rearrange_kspace(batch.masked_kspace,self.mode)
         mean, log_scale = self(input)
-        loss= laplace_nll(mean=mean, log_scale=log_scale, target=target)
+        loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("train_loss", loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
-        # self.log("nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
-        # self.log("l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
-        # Log GPU memory at any point
-        # print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
-        # print(f"Reserved: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
         return loss
 
     def test_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,0)
-        input = rearrange_kspace(batch.masked_kspace,0)
+        target = rearrange_kspace(batch.kspace,self.mode)
+        input = rearrange_kspace(batch.masked_kspace,self.mode)
         mean, log_scale = self(input)
-        test_loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
+        if self.test_criterion is None:
+            test_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
+        else:
+            sample = torch.zeros_like(target)
+            _, _, h, w = sample.shape
+            for i in range(h):
+                for j in range(w):
+                    mean, log_scale = self(sample)
+                    scale = torch.exp(log_scale[:, :, i, j])  # Convert log_scale to scale
+                    dist = Laplace(mean[:, :, i, j], scale)
+                    sample[:, :, i, j] = dist.sample().clamp(0, 1)  # Sample and clamp values to [0, 1]
+            test_loss = self.test_criterion(sample, target)
+        
         self.log("test_loss", test_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
     
     def validation_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,0)
-        input = rearrange_kspace(batch.masked_kspace,0)
+        target = rearrange_kspace(batch.kspace,self.mode)
+        input = rearrange_kspace(batch.masked_kspace,self.mode)
         mean, log_scale = self(input)
-        val_loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
+        val_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("val_loss", val_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
-        # self.log("val_nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
-        # self.log("val_l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
 
     @staticmethod
     def add_model_specific_args(parent_parser):  # pragma: no-cover

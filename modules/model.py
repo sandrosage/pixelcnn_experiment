@@ -3,61 +3,44 @@ from torch import nn
 from torch.distributions import Laplace
 import pytorch_lightning as pl
 from typing import Literal
+import torch.nn.functional as F
 
 # Laplace NLL Loss Function
-def laplace_nll(mean, log_scale, target, max_scale=10.0):
-    """
-    Computes the negative log-likelihood for Laplace predictions, 
-    with softplus activation for smooth positivity and a max threshold on scale.
-    
-    Args:
-        mean: Predicted mean.
-        log_scale: Predicted log-scale.
-        target: Ground truth values.
-        max_scale: Maximum allowable scale (default: 10.0).
-    
-    Returns:
-        Negative log-likelihood loss.
-    """
-    scale = torch.nn.functional.softplus(log_scale, threshold=10) + 1e-9  # Ensure strictly positive scale
-    # print("Scale: ", scale.max(), scale.min())
-    # Define Laplace distribution
-    dist = torch.distributions.Laplace(mean, scale)
-    # Compute negative log likelihood
-    nll = -dist.log_prob(target)
-    return nll.mean()
+class LaplaceNLL:
+    def __init__(
+        self,
+        non_negativity_fcn: Literal["exp", "softplus"] = "sofplus",
+        l2_on_log_scale: bool = False,
+        max_scale: int =10.0
+        ):
 
-# def laplace_nll(mean, log_scale, target, lambda_reg=1e-3):
-#     """
-#     Computes the negative log-likelihood for Laplace predictions with L2 regularization on log_scale.
-    
-#     Args:
-#         mean: Predicted mean.
-#         log_scale: Predicted log-scale.
-#         target: Ground truth values.
-#         lambda_reg: Strength of the L2 regularization term (default: 1e-3).
-    
-#     Returns:
-#         Loss (negative log-likelihood + L2 regularization penalty).
-#     """
-#     # Compute scale from log_scale using softplus or exp
-#     # print("Log scale: ", log_scale.max(), log_scale.min())
-#     # scale = torch.clamp(torch.exp(log_scale), max=10)
-#     scale = torch.nn.functional.softplus(log_scale, threshold=10) + 1e-9  # Ensure strictly positive scale
-#     # print("Scale: ", scale.max(), scale.min())
-#     # Define Laplace distribution
-#     dist = torch.distributions.Laplace(mean, scale)
-    
-#     # Compute negative log likelihood
-#     nll = -dist.log_prob(target)
-#     nll_loss = nll.mean()
-    
-#     # Add L2 regularization on log_scale
-#     l2_regularization = lambda_reg * torch.mean(log_scale**2)
-    
-#     # Total loss
-#     total_loss = nll_loss + l2_regularization
-#     return total_loss, nll_loss, l2_regularization
+        assert non_negativity_fcn in ("exp", "softplus"), "non_negativity_fcn must be either 'exp' or 'softplus'"
+
+        if non_negativity_fcn == "softplus":
+            self.scale_fn = lambda log_scale: F.softplus(log_scale, threshold=max_scale) + 1e-9
+        else:
+            self.scale_fn = lambda log_scale: torch.clamp(torch.exp(log_scale), max=max_scale) + 1e-9
+
+        self.l2_reg = l2_on_log_scale
+        
+    def __call__(
+        self, 
+        mean: torch.Tensor,
+        log_scale: torch.Tensor, 
+        target: torch.Tensor
+        ):
+
+        scale = self.scale_fn(log_scale=log_scale)
+        dist = Laplace(mean, scale)
+        nll = -dist.log_prob(target)
+        nll_loss = nll.mean()
+
+        if self.l2_reg: 
+            l2_regularization = 1e-3 * torch.mean(log_scale**2)
+            total_loss = nll_loss + l2_regularization
+            return total_loss
+        
+        return nll_loss
 
 
 def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
