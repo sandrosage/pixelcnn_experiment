@@ -4,64 +4,60 @@ from torch.distributions import Laplace
 import pytorch_lightning as pl
 from typing import Literal
 
-# # Laplace NLL Loss Function
-# def laplace_nll(mean, log_scale, target, max_scale=10.0):
-#     """
-#     Computes the negative log-likelihood for Laplace predictions, 
-#     with softplus activation for smooth positivity and a max threshold on scale.
-    
-#     Args:
-#         mean: Predicted mean.
-#         log_scale: Predicted log-scale.
-#         target: Ground truth values.
-#         max_scale: Maximum allowable scale (default: 10.0).
-    
-#     Returns:
-#         Negative log-likelihood loss.
-#     """
-#     # Use softplus to ensure scale > 0, then apply max threshold
-#     scale = torch.clamp(torch.exp(log_scale), max=10)
-#     # scale = torch.nn.functional.softplus(log_scale, threshold=10)
-#     print("Scale: ", scale.max(), scale.min())
-#     # scale = torch.clamp(scale, max=max_scale)  # Cap the scale to the maximum value
-#     # Define Laplace distribution
-#     dist = torch.distributions.Laplace(mean, scale)
-    
-#     # Compute negative log likelihood
-#     nll = -dist.log_prob(target)
-#     return nll.mean()
-
-def laplace_nll(mean, log_scale, target, lambda_reg=1e-3):
+# Laplace NLL Loss Function
+def laplace_nll(mean, log_scale, target, max_scale=10.0):
     """
-    Computes the negative log-likelihood for Laplace predictions with L2 regularization on log_scale.
+    Computes the negative log-likelihood for Laplace predictions, 
+    with softplus activation for smooth positivity and a max threshold on scale.
     
     Args:
         mean: Predicted mean.
         log_scale: Predicted log-scale.
         target: Ground truth values.
-        lambda_reg: Strength of the L2 regularization term (default: 1e-3).
+        max_scale: Maximum allowable scale (default: 10.0).
     
     Returns:
-        Loss (negative log-likelihood + L2 regularization penalty).
+        Negative log-likelihood loss.
     """
-    # Compute scale from log_scale using softplus or exp
-    # print("Log scale: ", log_scale.max(), log_scale.min())
-    # scale = torch.clamp(torch.exp(log_scale), max=10)
     scale = torch.nn.functional.softplus(log_scale, threshold=10) + 1e-9  # Ensure strictly positive scale
     # print("Scale: ", scale.max(), scale.min())
     # Define Laplace distribution
     dist = torch.distributions.Laplace(mean, scale)
-    
     # Compute negative log likelihood
     nll = -dist.log_prob(target)
-    nll_loss = nll.mean()
+    return nll.mean()
+
+# def laplace_nll(mean, log_scale, target, lambda_reg=1e-3):
+#     """
+#     Computes the negative log-likelihood for Laplace predictions with L2 regularization on log_scale.
     
-    # Add L2 regularization on log_scale
-    l2_regularization = lambda_reg * torch.mean(log_scale**2)
+#     Args:
+#         mean: Predicted mean.
+#         log_scale: Predicted log-scale.
+#         target: Ground truth values.
+#         lambda_reg: Strength of the L2 regularization term (default: 1e-3).
     
-    # Total loss
-    total_loss = nll_loss + l2_regularization
-    return total_loss, nll_loss, l2_regularization
+#     Returns:
+#         Loss (negative log-likelihood + L2 regularization penalty).
+#     """
+#     # Compute scale from log_scale using softplus or exp
+#     # print("Log scale: ", log_scale.max(), log_scale.min())
+#     # scale = torch.clamp(torch.exp(log_scale), max=10)
+#     scale = torch.nn.functional.softplus(log_scale, threshold=10) + 1e-9  # Ensure strictly positive scale
+#     # print("Scale: ", scale.max(), scale.min())
+#     # Define Laplace distribution
+#     dist = torch.distributions.Laplace(mean, scale)
+    
+#     # Compute negative log likelihood
+#     nll = -dist.log_prob(target)
+#     nll_loss = nll.mean()
+    
+#     # Add L2 regularization on log_scale
+#     l2_regularization = lambda_reg * torch.mean(log_scale**2)
+    
+#     # Total loss
+#     total_loss = nll_loss + l2_regularization
+#     return total_loss, nll_loss, l2_regularization
 
 
 def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
@@ -178,6 +174,7 @@ class CausalResidualBlock(nn.Module):
             nn.Conv2d(
                 in_channels=n_channels, out_channels=n_channels // 2, kernel_size=1
             ),
+            nn.BatchNorm2d(n_channels // 2),
             nn.ReLU(),
             MaskedConv2d(
                 mask_type='B',
@@ -186,6 +183,7 @@ class CausalResidualBlock(nn.Module):
                 kernel_size=3,
                 padding=1,
             ),
+            nn.BatchNorm2d(n_channels // 2),
             nn.ReLU(),
             nn.Conv2d(
                 in_channels=n_channels // 2, out_channels=n_channels, kernel_size=1
@@ -367,7 +365,7 @@ class ResidualPixelCNN(nn.Module):
                 kernel_size=1,
             ),
             nn.ReLU(),
-            nn.Conv2d(
+            LaplaceConv2d(
                 in_channels=head_channels, out_channels=out_channels, kernel_size=1
             )
         )
@@ -427,7 +425,7 @@ class GatedPixelCNN(nn.Module):
                 in_channels=gated_channels, out_channels=head_channels, kernel_size=1
             ),
             nn.ReLU(),
-            nn.Conv2d(
+            LaplaceConv2d(
                 in_channels=head_channels, out_channels=out_channels, kernel_size=1
             ),
         )

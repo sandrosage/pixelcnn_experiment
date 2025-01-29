@@ -1,4 +1,4 @@
-from modules.model import PixelCNN, laplace_nll, rearrange_kspace
+from modules.model import PixelCNN, laplace_nll, rearrange_kspace, GatedPixelCNN, ResidualPixelCNN
 import pytorch_lightning as pl
 from torch import optim
 from argparse import ArgumentParser
@@ -46,10 +46,10 @@ class PixelCNNModule(pl.LightningModule):
         target = rearrange_kspace(batch.kspace,0)
         input = rearrange_kspace(batch.masked_kspace,0)
         mean, log_scale = self(input)
-        loss, nll, l2_reg = laplace_nll(mean=mean, log_scale=log_scale, target=target)
+        loss= laplace_nll(mean=mean, log_scale=log_scale, target=target)
         self.log("train_loss", loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
-        self.log("l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
+        # self.log("nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
+        # self.log("l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
         # Log GPU memory at any point
         # print(f"Allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
         # print(f"Reserved: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
@@ -66,10 +66,10 @@ class PixelCNNModule(pl.LightningModule):
         target = rearrange_kspace(batch.kspace,0)
         input = rearrange_kspace(batch.masked_kspace,0)
         mean, log_scale = self(input)
-        val_loss, nll, l2_reg = laplace_nll(mean=mean, log_scale=log_scale, target=target)
+        val_loss = laplace_nll(mean=mean, log_scale=log_scale, target=target)
         self.log("val_loss", val_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
-        self.log("val_nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
-        self.log("val_l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
+        # self.log("val_nll_loss", nll,  sync_dist=True, on_step=True, on_epoch=True)
+        # self.log("val_l2_loss", l2_reg,  sync_dist=True, on_step=True, on_epoch=True)
 
     @staticmethod
     def add_model_specific_args(parent_parser):  # pragma: no-cover

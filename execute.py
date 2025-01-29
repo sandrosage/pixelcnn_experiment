@@ -11,7 +11,7 @@ if __name__ == "__main__":
     transform = transforms.Compose([
         transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
     ]) 
-    model = PixelCNNModule()
+    model = PixelCNNModule(n_layers=10)
     dm = ReconstructKspaceDataModule(
         Path("../knee_dataset"),
         challenge="singlecoil",
@@ -22,5 +22,5 @@ if __name__ == "__main__":
         batch_size=1,
         num_workers=8,
         use_dataset_cache_file=True)
-    trainer = pl.Trainer(max_epochs=25)
+    trainer = pl.Trainer(max_epochs=10, default_root_dir="PixelCNN")
     trainer.fit(model, dm)

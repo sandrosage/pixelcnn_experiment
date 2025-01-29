@@ -157,7 +157,7 @@ cython_debug/
 knee_dataset/
 lightning_logs/
 MNIST/
-pixelcnn/
+*.pkl
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
