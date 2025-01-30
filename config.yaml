@@ -1,0 +1,31 @@
+project: PixelCNN
+
+mode: test
+
+datamodule:
+  challenge: singlecoil
+  data_path: D:/knee_dataset
+  batch_size: 1
+  num_workers: 8
+  use_dataset_cache_file: True
+
+model:
+  in_channels: 1
+  n_layers: 8
+  hidden_channels: 64
+  lr: 0.0003 
+  test_criterion:
+  channel_mode: real
+  ckpt_path: pixelcnn\lightning_logs\version_2\checkpoints\epoch=0-step=34742.ckpt
+
+trainer:
+  max_epochs: 10
+  default_root_dir: "."
+  callbacks:
+    model_ckpt:
+      save_top_k: 2
+      monitor: val_loss
+      mode: min
+  
+
+

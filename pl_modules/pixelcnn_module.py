@@ -3,7 +3,6 @@ import pytorch_lightning as pl
 from torch import optim, nn
 from argparse import ArgumentParser
 from typing import Literal, Optional
-from ignite.metrics import SSIM
 from torch.distributions import Laplace
 import torch
 
@@ -34,7 +33,7 @@ class PixelCNNModule(pl.LightningModule):
         self.criterion = LaplaceNLL()
         
         assert channel_mode in ("real", "imag"), "channel_mode must either be 'real' or 'imag'"
-        assert test_criterion in ("mse", "ssim") or None, "test_criterion must be either 'mse', 'ssim' or None"
+        assert (test_criterion in ("mse", "ssim") or test_criterion is None), "test_criterion must be either 'mse', 'ssim' or None"
         
         if channel_mode == "real":
             self.mode = 0
@@ -45,9 +44,12 @@ class PixelCNNModule(pl.LightningModule):
         if test_criterion == "mse":
             self.test_criterion = nn.MSELoss()
         elif test_criterion == "ssim":
-            self.test_criterion = SSIM()
+            # ToDo
+            self.test_criterion = None
         else:
             self.test_criterion = None
+        
+        print("TEST CRITERION: ", self.test_criterion if self.test_criterion is not None else "LaplaceNLL")
             
     
     def configure_optimizers(self):
@@ -64,16 +66,14 @@ class PixelCNNModule(pl.LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,self.mode)
-        input = rearrange_kspace(batch.masked_kspace,self.mode)
+        input, target = rearrange_kspace(batch, self.mode)
         mean, log_scale = self(input)
         loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("train_loss", loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,self.mode)
-        input = rearrange_kspace(batch.masked_kspace,self.mode)
+        input, target = rearrange_kspace(batch, self.mode)
         mean, log_scale = self(input)
         if self.test_criterion is None:
             test_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
@@ -91,8 +91,7 @@ class PixelCNNModule(pl.LightningModule):
         self.log("test_loss", test_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
     
     def validation_step(self, batch, batch_idx):
-        target = rearrange_kspace(batch.kspace,self.mode)
-        input = rearrange_kspace(batch.masked_kspace,self.mode)
+        input, target = rearrange_kspace(batch, self.mode)
         mean, log_scale = self(input)
         val_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("val_loss", val_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)

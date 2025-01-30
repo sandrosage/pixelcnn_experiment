@@ -6,3 +6,4 @@ requests
 torchsummary
 pytorch-lightning
 tensorboard
+pytorch-ignite

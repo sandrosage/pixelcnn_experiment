@@ -158,6 +158,8 @@ knee_dataset/
 lightning_logs/
 MNIST/
 *.pkl
+outputs/
+*profiler_logs.txt
 
 # PyCharm
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can

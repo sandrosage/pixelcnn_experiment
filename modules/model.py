@@ -1,7 +1,6 @@
 import torch
 from torch import nn
 from torch.distributions import Laplace
-import pytorch_lightning as pl
 from typing import Literal
 import torch.nn.functional as F
 
@@ -9,7 +8,7 @@ import torch.nn.functional as F
 class LaplaceNLL:
     def __init__(
         self,
-        non_negativity_fcn: Literal["exp", "softplus"] = "sofplus",
+        non_negativity_fcn: Literal["exp", "softplus"] = "softplus",
         l2_on_log_scale: bool = False,
         max_scale: int =10.0
         ):
@@ -43,41 +42,11 @@ class LaplaceNLL:
         return nll_loss
 
 
-def rearrange_kspace(kspace: torch.Tensor, imag: Literal[0,1] = 0): 
-    return kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
+def rearrange_kspace(batch: list, imag: Literal[0,1] = 0): 
+    kspace = batch.kspace
+    masked_kspace = batch.masked_kspace
+    return masked_kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:], kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
 
-
-class LaplaceConv2dBN(nn.Module):
-    def __init__(self, in_channels, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True, eps=1e-6):
-        """
-        Outputs parameters (mean, log_scale) of a Laplace distribution for each pixel.
-        Normalization added to make training more robust.
-        """
-        super(LaplaceConv2dBN, self).__init__()
-        self.eps = eps
-        
-        # Define convolution layers for mean and log_scale
-        self.conv_mean = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        self.conv_log_scale = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding, bias=bias)
-        
-        # Add Batch Normalization for both conv layers (to stabilize outputs)
-        self.bn_mean = nn.BatchNorm2d(out_channels)
-        self.bn_log_scale = nn.BatchNorm2d(out_channels)
-
-    def forward(self, x):
-        # Compute mean and log_scale
-        mean = self.conv_mean(x)
-        mean = self.bn_mean(mean)  # Normalize mean
-
-        log_scale = self.conv_log_scale(x)
-        log_scale = self.bn_log_scale(log_scale)  # Normalize log_scale
-        
-        # # Clamp log_scale to avoid extreme values and numerical issues
-        print("Clamp: ", torch.log(torch.tensor(self.eps, device=log_scale.device)))
-        log_scale = torch.clamp(log_scale, min=torch.log(torch.tensor(self.eps, device=log_scale.device)))
-        # print("log_scale")
-
-        return mean, log_scale
 
 # LaplaceConv2d Definition
 class LaplaceConv2d(nn.Module):
