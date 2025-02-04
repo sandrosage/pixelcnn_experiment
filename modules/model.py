@@ -1,8 +1,45 @@
 import torch
 from torch import nn
 from torch.distributions import Laplace
-from typing import Literal
+from typing import Literal, Tuple
 import torch.nn.functional as F
+
+
+class AdaptivePoolTransform(nn.Module):
+    def __init__(self, output_size: Tuple[int, int], pool_type: Literal["avg", "max"] = "avg"):
+        assert pool_type in ("max", "avg"), "pooling type must either be 'max' or 'avg'"
+        self.output_size = output_size
+        self.pool_type = pool_type
+    
+    def __forward__(self, input: torch.Tensor) -> torch.Tensor:
+        if self.pool_type == "avg":
+            return F.adaptive_avg_pool2d(input, self.output_size)
+        else:
+            return F.adaptive_max_pool2d(input, self.output_size)
+        
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(output_size={self.output_size}, pool_type={self.pool_type})"
+    
+class ZeroPaddingTransform(nn.Module):
+    def __init__(self, target_size: Tuple[int, int]):
+        self.target_size = target_size
+    
+    def __forward__(self, input: torch.Tensor) -> torch.Tensor:
+        h, w = input.shape[-2:]  # Assuming (_, _, H, W) or (_, H, W)
+        pad_h = max(0, self.target_size[0] - h)
+        pad_w = max(0, self.target_size[1] - w)
+        pad_top = pad_h // 2
+        pad_bottom = pad_h - pad_top
+        pad_left = pad_w // 2
+        pad_right = pad_w - pad_left
+        # Padding format for torch.nn.functional.pad: (left, right, top, bottom)
+        padding = (pad_left, pad_right, pad_top, pad_bottom)
+        return F.pad(input, padding, mode='constant', value=0)
+        
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(target_size={self.target_size})"
+
+    
 
 # Laplace NLL Loss Function
 class LaplaceNLL:

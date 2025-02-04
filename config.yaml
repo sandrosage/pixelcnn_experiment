@@ -1,11 +1,16 @@
 project: PixelCNN
-
-mode: test
+mode: train
 
 datamodule:
   challenge: singlecoil
-  data_path: D:/knee_dataset
+  data_path: ../knee_dataset
   batch_size: 1
+  kspace:
+    mode: adaptive
+    size_x: 640
+    size_y: 320
+    pooling: avg
+    
   num_workers: 8
   use_dataset_cache_file: True
 
@@ -20,7 +25,7 @@ model:
 
 trainer:
   max_epochs: 10
-  default_root_dir: "."
+  default_root_dir: "TryOutNewStuff"
   callbacks:
     model_ckpt:
       save_top_k: 2
