@@ -3,8 +3,8 @@ mode: train
 
 datamodule:
   challenge: singlecoil
-  data_path: ../knee_dataset
-  batch_size: 1
+  data_path: D:\knee_dataset
+  batch_size: 4
   kspace:
     mode: adaptive
     size_x: 640

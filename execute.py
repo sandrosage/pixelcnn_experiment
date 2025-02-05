@@ -20,9 +20,11 @@ def main():
 
     transform = transforms.Normalize(mean=(0.0,), std=(1.0,))  # Assume Laplace distributed inputs are mean 0, std 1
 
+    kspace_flag = cfg_dm["kspace"]
     if batch_size > 1:
-        kspace_flag = cfg_dm["kspace"]
-        assert (kspace_flag is not None), "the kspace_mode flag must be set if batchsize > 1"
+        assert (kspace_flag is not None), "the kspace flag must be set if batchsize > 1"
+    
+    if kspace_flag is not None:
         assert (kspace_flag["mode"] in ("adaptive", "padding")), "the kspace mode must either be 'adaptive' or 'padding'"
         if kspace_flag["mode"] == "adaptive":
             transform = transforms.Compose([
@@ -34,7 +36,8 @@ def main():
                 ZeroPaddingTransform(target_size=(kspace_flag["size_x"], kspace_flag["size_y"])),
                 transform
             ])
-            
+
+    print(f"MODEL TRANSFORM: {transform}")
 
     dm = ReconstructKspaceDataModule(
         data_path=Path(cfg_dm["data_path"]),
