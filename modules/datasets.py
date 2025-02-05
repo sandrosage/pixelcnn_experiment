@@ -1,4 +1,4 @@
-from typing import Optional, Union, Callable, Tuple
+from typing import Optional, Union, Callable, Tuple, Literal
 from modules.kspace_data import KspaceSample
 import torch
 import fastmri.data.transforms as T
@@ -8,9 +8,11 @@ import os
 from pathlib import Path
 import h5py
 import numpy as np
+
 class filter_raw_sample():
                 def __call__(self, raw_sample):
                     return True
+                
     
 class SingleCoilKnee(SliceDataset):
     def __init__(self, 
@@ -73,7 +75,7 @@ class ReconstructKspaceDataset(SliceDataset):
             return (kspace, mask, target, attrs, fname.name, dataslice)
         else:
             sample = self.transform(kspace, mask, target, attrs, fname.name, dataslice)
-        
+            sample = KspaceSample(sample.kspace.permute(2,0,1), sample.masked_kspace.permute(2,0,1))
             if self.model_transform is None:
                 return sample
         

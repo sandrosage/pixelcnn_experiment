@@ -7,11 +7,12 @@ import torch.nn.functional as F
 
 class AdaptivePoolTransform(nn.Module):
     def __init__(self, output_size: Tuple[int, int], pool_type: Literal["avg", "max"] = "avg"):
+        super().__init__()
         assert pool_type in ("max", "avg"), "pooling type must either be 'max' or 'avg'"
         self.output_size = output_size
         self.pool_type = pool_type
     
-    def __forward__(self, input: torch.Tensor) -> torch.Tensor:
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         if self.pool_type == "avg":
             return F.adaptive_avg_pool2d(input, self.output_size)
         else:
@@ -22,10 +23,11 @@ class AdaptivePoolTransform(nn.Module):
     
 class ZeroPaddingTransform(nn.Module):
     def __init__(self, target_size: Tuple[int, int]):
+        super().__init__()
         self.target_size = target_size
     
-    def __forward__(self, input: torch.Tensor) -> torch.Tensor:
-        h, w = input.shape[-2:]  # Assuming (_, _, H, W) or (_, H, W)
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        h, w = input.shape[-2:]  # Assuming (C, H, W) or (B, C, H, W)
         pad_h = max(0, self.target_size[0] - h)
         pad_w = max(0, self.target_size[1] - w)
         pad_top = pad_h // 2
@@ -39,7 +41,6 @@ class ZeroPaddingTransform(nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(target_size={self.target_size})"
 
-    
 
 # Laplace NLL Loss Function
 class LaplaceNLL:
@@ -82,7 +83,8 @@ class LaplaceNLL:
 def rearrange_kspace(batch: list, imag: Literal[0,1] = 0): 
     kspace = batch.kspace
     masked_kspace = batch.masked_kspace
-    return masked_kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:], kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
+    # return masked_kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:], kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
+    return masked_kspace[:,0+imag:1+imag,:,:], kspace[:,0+imag:1+imag,:,:]
 
 
 # LaplaceConv2d Definition
