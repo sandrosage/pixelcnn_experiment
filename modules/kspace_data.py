@@ -3,6 +3,7 @@ import torch
 from fastmri.data.subsample import MaskFunc
 import numpy as np
 from fastmri.data.transforms import to_tensor, apply_mask
+from fastmri import ifft2c, complex_abs
 import fastmri.data.transforms as T
 
 class TransformLabel(T.VarNetDataTransform):
@@ -105,6 +106,7 @@ class KspaceSample(NamedTuple):
     """
     kspace : torch.Tensor
     masked_kspace: torch.Tensor
+    reconstruction: torch.Tensor
     # num_low_frequencies: Optional[int]
     # target: torch.Tensor
     # fname: str
@@ -163,6 +165,8 @@ class KspaceDataTransform:
             max_value = 0.0
 
         kspace_torch = to_tensor(kspace)
+        slice_image = ifft2c(kspace_torch)           # Apply Inverse Fourier Transform to get the complex image
+        reconstruction = complex_abs(slice_image)   # Compute absolute value to get a real image
         seed = None if not self.use_seed else tuple(map(ord, fname))
         acq_start = attrs["padding_left"]
         acq_end = attrs["padding_right"]
@@ -177,6 +181,7 @@ class KspaceDataTransform:
             sample = KspaceSample(
                 kspace=kspace_torch,
                 masked_kspace=masked_kspace,
+                reconstruction=reconstruction,
                 # num_low_frequencies=num_low_frequencies,
                 # target=target_torch,
                 # fname=fname,
@@ -188,6 +193,7 @@ class KspaceDataTransform:
             sample = KspaceSample(
                 kspace=kspace_torch,
                 masked_kspace=kspace_torch,
+                reconstruction=reconstruction
                 # num_low_frequencies=0,
                 # target=target_torch,
                 # fname=fname,

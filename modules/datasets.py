@@ -75,10 +75,10 @@ class ReconstructKspaceDataset(SliceDataset):
             return (kspace, mask, target, attrs, fname.name, dataslice)
         else:
             sample = self.transform(kspace, mask, target, attrs, fname.name, dataslice)
-            sample = KspaceSample(sample.kspace.permute(2,0,1), sample.masked_kspace.permute(2,0,1))
+            sample = KspaceSample(sample.kspace.permute(2,0,1), sample.masked_kspace.permute(2,0,1),sample.reconstruction)
             if self.model_transform is None:
                 return sample
         
             else:
-                return KspaceSample(kspace=self.model_transform(sample.kspace), masked_kspace=self.model_transform(sample.masked_kspace))
+                return KspaceSample(kspace=self.model_transform(sample.kspace), masked_kspace=self.model_transform(sample.masked_kspace), reconstruction=self.model_transform(sample.reconstruction))
              
