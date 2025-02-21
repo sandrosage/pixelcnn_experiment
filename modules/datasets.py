@@ -48,7 +48,7 @@ class ReconstructKspaceDataset(SliceDataset):
                 dataset_cache_file: Union[str, Path, os.PathLike] = "dataset_cache.pkl", 
                 num_cols: Optional[Tuple[int]] = None, 
                 raw_sample_filter = None):
-        
+
         self.model_transform = model_transform
         if raw_sample_filter is None:
 
@@ -75,7 +75,9 @@ class ReconstructKspaceDataset(SliceDataset):
             return (kspace, mask, target, attrs, fname.name, dataslice)
         else:
             sample = self.transform(kspace, mask, target, attrs, fname.name, dataslice)
-            sample = KspaceSample(sample.kspace.permute(2,0,1), sample.masked_kspace.permute(2,0,1),sample.reconstruction)
+            print(sample.kspace.shape)
+            print(sample.masked_kspace.shape)
+            print(sample.reconstruction.shape)
             if self.model_transform is None:
                 return sample
         

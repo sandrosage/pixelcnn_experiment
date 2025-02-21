@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 from fastmri.data.subsample import MaskFunc
-from typing import Optional, Callable, Union
+from typing import Optional, Callable, Union, Literal
 import os
 from modules.datasets import SingleCoilKnee, ReconstructKspaceDataset
 from fastmri.pl_modules import FastMriDataModule

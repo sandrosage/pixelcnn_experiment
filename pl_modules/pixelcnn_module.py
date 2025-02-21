@@ -1,4 +1,4 @@
-from modules.model import PixelCNN, rearrange_kspace, LaplaceNLL
+from modules.model import PixelCNN, LaplaceNLL
 import pytorch_lightning as pl
 from torch import optim, nn
 from argparse import ArgumentParser
@@ -31,15 +31,9 @@ class PixelCNNModule(pl.LightningModule):
         self.weight_decay = weight_decay
         self.model = PixelCNN(in_channels=self.in_channels, n_layers=self.n_layers, hidden_channels=self.hidden_channels)
         self.criterion = LaplaceNLL()
+        self._channel_mode = channel_mode
         
-        assert channel_mode in ("real", "imag"), "channel_mode must either be 'real' or 'imag'"
         assert (test_criterion in ("mse", "ssim") or test_criterion is None), "test_criterion must be either 'mse', 'ssim' or None"
-        
-        if channel_mode == "real":
-            self.mode = 0
-        
-        else:
-            self.mode = 1
 
         if test_criterion == "mse":
             self.test_criterion = nn.MSELoss()

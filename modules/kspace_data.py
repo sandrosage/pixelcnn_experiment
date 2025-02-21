@@ -1,10 +1,11 @@
-from typing import NamedTuple, Optional, Tuple, Dict
+from typing import NamedTuple, Optional, Dict
 import torch
 from fastmri.data.subsample import MaskFunc
 import numpy as np
 from fastmri.data.transforms import to_tensor, apply_mask
 from fastmri import ifft2c, complex_abs
 import fastmri.data.transforms as T
+
 
 class TransformLabel(T.VarNetDataTransform):
     def __init__(self, mask_func = None, use_seed = True):
@@ -92,27 +93,16 @@ class TransformLabel(T.VarNetDataTransform):
 
 class KspaceSample(NamedTuple):
     """
-    A sample of masked k-space for variational network reconstruction.
+    A sample of masked k-space for pixelcnn model.
 
     Args:
-        masked_kspace: k-space after applying sampling mask.
-        num_low_frequencies: The number of samples for the densely-sampled
-            center.
-        target: The target image (if applicable).
-        fname: File name.
-        slice_num: The slice index.
-        max_value: Maximum image value.
-        crop_size: The size to crop the final image.
+        kspace: original unmasked k-space
+        masked_kspace: k-space after applying sampling mask
+        reconstruction: reconstructed real image
     """
     kspace : torch.Tensor
     masked_kspace: torch.Tensor
     reconstruction: torch.Tensor
-    # num_low_frequencies: Optional[int]
-    # target: torch.Tensor
-    # fname: str
-    # slice_num: int
-    # max_value: float
-    # crop_size: Tuple[int, int]
 
 
 class KspaceDataTransform:
@@ -120,7 +110,7 @@ class KspaceDataTransform:
     Data Transformer for training Kspace reconstruction models.
     """
 
-    def __init__(self, mask_func: Optional[MaskFunc] = None, use_seed: bool = True):
+    def __init__(self, mask_func: Optional[MaskFunc] = None, use_seed: bool = True, channel_mode: int = -1):
         """
         Args:
             mask_func: Optional; A function that can create a mask of
@@ -129,6 +119,15 @@ class KspaceDataTransform:
                 generator seed from the filename. This ensures that the same
                 mask is used for all the slices of a given volume every time.
         """
+        assert 1 >= channel_mode >= -1, "the channel_mode must either be '-1' for both channels (im + re), '0' for re and '1' for im channel"
+        if channel_mode == -1:
+            print(f"{self.__class__.__name__}: use both channels (im + re)")
+        elif channel_mode == 1:
+            print(f"{self.__class__.__name__}: use im channel")
+        else:
+            print(f"{self.__class__.__name__}: use re channel")
+
+        self.channel_mode = channel_mode
         self.mask_func = mask_func
         self.use_seed = use_seed
 
@@ -165,7 +164,7 @@ class KspaceDataTransform:
             max_value = 0.0
 
         kspace_torch = to_tensor(kspace)
-        slice_image = ifft2c(kspace_torch)           # Apply Inverse Fourier Transform to get the complex image
+        slice_image = ifft2c(kspace_torch[:,:,0+self.channel_mode:1+self.channel_mode])           # Apply Inverse Fourier Transform to get the complex image
         reconstruction = complex_abs(slice_image)   # Compute absolute value to get a real image
         seed = None if not self.use_seed else tuple(map(ord, fname))
         acq_start = attrs["padding_left"]
@@ -179,27 +178,15 @@ class KspaceDataTransform:
             )
 
             sample = KspaceSample(
-                kspace=kspace_torch,
-                masked_kspace=masked_kspace,
-                reconstruction=reconstruction,
-                # num_low_frequencies=num_low_frequencies,
-                # target=target_torch,
-                # fname=fname,
-                # slice_num=slice_num,
-                # max_value=max_value,
-                # crop_size=crop_size,
+                kspace=kspace_torch.permute(2,0,1)[0+self.channel_mode:1+self.channel_mode,:,:],
+                masked_kspace=masked_kspace.permute(2,0,1)[0+self.channel_mode:1+self.channel_mode,:,:],
+                reconstruction=reconstruction
             )
         else:
+            kspace_torch = kspace_torch.permute(2,0,1)[0+self.channel_mode:1+self.channel_mode,:,:]
             sample = KspaceSample(
                 kspace=kspace_torch,
                 masked_kspace=kspace_torch,
                 reconstruction=reconstruction
-                # num_low_frequencies=0,
-                # target=target_torch,
-                # fname=fname,
-                # slice_num=slice_num,
-                # max_value=max_value,
-                # crop_size=crop_size,
             )
-
         return sample

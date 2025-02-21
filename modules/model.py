@@ -79,14 +79,6 @@ class LaplaceNLL:
         
         return nll_loss
 
-
-def rearrange_kspace(batch: list, imag: Literal[0,1] = 0): 
-    kspace = batch.kspace
-    masked_kspace = batch.masked_kspace
-    # return masked_kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:], kspace.permute(0,3,1,2)[:,0+imag:1+imag,:,:]
-    return masked_kspace[:,0+imag:1+imag,:,:], kspace[:,0+imag:1+imag,:,:]
-
-
 # LaplaceConv2d Definition
 class LaplaceConv2d(nn.Module):
     def __init__(self, in_channels, out_channels=1, kernel_size=1, stride=1, padding=0, bias=True):

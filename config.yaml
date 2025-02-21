@@ -1,15 +1,11 @@
 project: PixelCNN
-mode: train
+mode: test
 
 datamodule:
   challenge: singlecoil
   data_path: D:\knee_dataset
-  batch_size: 4
+  batch_size: 1
   kspace:
-    mode: adaptive
-    size_x: 640
-    size_y: 320
-    pooling: avg
     
   num_workers: 8
   use_dataset_cache_file: True
@@ -19,7 +15,7 @@ model:
   n_layers: 8
   hidden_channels: 64
   lr: 0.0003 
-  test_criterion:
+  test_criterion: mse
   channel_mode: real
   ckpt_path: pixelcnn\lightning_logs\version_2\checkpoints\epoch=0-step=34742.ckpt
 

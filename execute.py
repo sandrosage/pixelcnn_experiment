@@ -39,15 +39,22 @@ def main():
 
     print(f"MODEL TRANSFORM: {transform}")
 
+    assert cfg_model["channel_mode"] in ("real", "imag"), "channel_mode must either be 'real' or 'imag'"
+    if cfg_model["channel_mode"] == "real":
+        channel_mode = 0
+    else:
+        channel_mode = 1
+
+    kspace_transform = KspaceDataTransform(channel_mode=channel_mode)
     dm = ReconstructKspaceDataModule(
         data_path=Path(cfg_dm["data_path"]),
         challenge=cfg_dm["challenge"],
         batch_size=cfg_dm["batch_size"],
         num_workers=cfg_dm["num_workers"],
         use_dataset_cache_file=cfg_dm["use_dataset_cache_file"],
-        train_transform=KspaceDataTransform(),
-        val_transform=KspaceDataTransform(),
-        test_transform=KspaceDataTransform(),
+        train_transform=kspace_transform,
+        val_transform=kspace_transform,
+        test_transform=kspace_transform,
         model_transform=transform,
     )
 
@@ -83,9 +90,12 @@ def main():
     
     else:
         assert cfg_model["ckpt_path"] is not None, "for test mode the checkpoint path must be set"
-        print("-------------- TEST SCRIPT FOR MODEL EVALUATION --------------".format(cfg_model["ckpt_path"]))
-        print("-------------- LOAD MODEL FROM CHECKPOINT: {} --------------")
-        model = PixelCNNModule.load_from_checkpoint(cfg_model["ckpt_path"])
+        print("-------------- TEST SCRIPT FOR MODEL EVALUATION --------------")
+        print("-------------- LOAD MODEL FROM CHECKPOINT: {} --------------".format(cfg_model["ckpt_path"]))
+        model = PixelCNNModule.load_from_checkpoint(
+            cfg_model["ckpt_path"], 
+            test_criterion=cfg_model["test_criterion"], 
+            channel_mode=cfg_model["channel_mode"])
         trainer.test(model,dm)
     
 
