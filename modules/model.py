@@ -3,6 +3,7 @@ from torch import nn
 from torch.distributions import Laplace
 from typing import Literal, Tuple
 import torch.nn.functional as F
+from fastmri.data.transforms import complex_center_crop, center_crop
 
 
 class AdaptivePoolTransform(nn.Module):
@@ -41,6 +42,20 @@ class ZeroPaddingTransform(nn.Module):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(target_size={self.target_size})"
 
+class CenterCropTransform(nn.Module):
+    def __init__(self, target_size: Tuple[int, int]):
+        super().__init__()
+        self.target_size = target_size
+    
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
+        try:
+            return complex_center_crop(input, self.target_size)
+        except:
+            return center_crop(input, self.target_size)
+        
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(target_size={self.target_size})"
+    
 
 # Laplace NLL Loss Function
 class LaplaceNLL:
@@ -73,7 +88,8 @@ class LaplaceNLL:
         nll_loss = nll.mean()
 
         if self.l2_reg: 
-            l2_regularization = 1e-3 * torch.mean(log_scale**2)
+            # l2_regularization = 1e-3 * torch.mean(log_scale**2)
+            l2_regularization = 1e-3 * torch.sqrt(torch.sum(log_scale**2))
             total_loss = nll_loss + l2_regularization
             return total_loss
         

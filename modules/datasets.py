@@ -1,7 +1,6 @@
-from typing import Optional, Union, Callable, Tuple, Literal
-from modules.kspace_data import KspaceSample
+from typing import Optional, Union, Callable, Tuple
+from modules.kspace_data import KspaceSample, KspaceSampleMaskInfo
 import torch
-import fastmri.data.transforms as T
 from diffusers.schedulers import DDPMScheduler, DDIMScheduler
 from fastmri.data import SliceDataset
 import os
@@ -50,6 +49,10 @@ class ReconstructKspaceDataset(SliceDataset):
                 raw_sample_filter = None):
 
         self.model_transform = model_transform
+        self.has_mask = False
+        if transform is not None:  
+            self.has_mask = True if transform.mask_func is not None else False
+            
         if raw_sample_filter is None:
 
             raw_sample_filter = filter_raw_sample()
@@ -75,12 +78,12 @@ class ReconstructKspaceDataset(SliceDataset):
             return (kspace, mask, target, attrs, fname.name, dataslice)
         else:
             sample = self.transform(kspace, mask, target, attrs, fname.name, dataslice)
-            print(sample.kspace.shape)
-            print(sample.masked_kspace.shape)
-            print(sample.reconstruction.shape)
             if self.model_transform is None:
                 return sample
         
             else:
-                return KspaceSample(kspace=self.model_transform(sample.kspace), masked_kspace=self.model_transform(sample.masked_kspace), reconstruction=self.model_transform(sample.reconstruction))
+                if self.has_mask:
+                    return KspaceSampleMaskInfo(kspace=self.model_transform(sample.kspace), masked_kspace=self.model_transform(sample.masked_kspace), reconstruction=sample.reconstruction, mask_info=sample.mask_info)
+                else:
+                    return KspaceSample(kspace=self.model_transform(sample.kspace), masked_kspace=self.model_transform(sample.masked_kspace), reconstruction=sample.reconstruction)
              

@@ -16,7 +16,7 @@ class PixelCNNModule(pl.LightningModule):
             lr_gamma: float = 0.1,
             weight_decay: float = 0.0,
             test_criterion: Optional[Literal["mse", "ssim"]] = None,
-            channel_mode: Literal["real", "imag"] = "real",
+            channel_mode: Literal["real", "imag", "both"] = "real",
             **kwargs
         ):
         super().__init__(**kwargs)
@@ -60,14 +60,22 @@ class PixelCNNModule(pl.LightningModule):
         return self.model(x)
     
     def training_step(self, batch, batch_idx):
-        input, target = rearrange_kspace(batch, self.mode)
+        if len(batch) == 4:
+            target, input, reconstruction, mask_info  = batch
+        else:
+            target, input, reconstruction  = batch
+
         mean, log_scale = self(input)
         loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("train_loss", loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx):
-        input, target = rearrange_kspace(batch, self.mode)
+        if len(batch) == 4:
+            target, input, reconstruction, mask_info  = batch
+        else:
+            target, input, reconstruction  = batch
+
         mean, log_scale = self(input)
         if self.test_criterion is None:
             test_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
@@ -79,13 +87,18 @@ class PixelCNNModule(pl.LightningModule):
                     mean, log_scale = self(sample)
                     scale = torch.exp(log_scale[:, :, i, j])  # Convert log_scale to scale
                     dist = Laplace(mean[:, :, i, j], scale)
-                    sample[:, :, i, j] = dist.sample().clamp(0, 1)  # Sample and clamp values to [0, 1]
+                    sample[:, :, i, j] = dist.sample()
+            print("Sampling done")
             test_loss = self.test_criterion(sample, target)
         
         self.log("test_loss", test_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)
     
     def validation_step(self, batch, batch_idx):
-        input, target = rearrange_kspace(batch, self.mode)
+        if len(batch) == 4:
+            target, input, reconstruction, mask_info  = batch
+        else:
+            target, input, reconstruction  = batch
+            
         mean, log_scale = self(input)
         val_loss = self.criterion(mean=mean, log_scale=log_scale, target=target)
         self.log("val_loss", val_loss,  sync_dist=True, on_step=True, on_epoch=True, prog_bar=True)

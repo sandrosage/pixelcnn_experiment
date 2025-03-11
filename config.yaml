@@ -6,7 +6,13 @@ datamodule:
   data_path: D:\knee_dataset
   batch_size: 1
   kspace:
-    
+    mode: center_crop
+    size_x: 320
+    size_y: 320
+  mask_func:
+    type: random_info
+    center_fractions: [0.04, 0.08]
+    accelerations: [8, 4]
   num_workers: 8
   use_dataset_cache_file: True
 
